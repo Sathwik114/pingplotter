@@ -1,0 +1,25 @@
+{
+    "name": "network-monitor",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev -p 8003",
+        "build": "next build",
+        "start": "next start -p 8003",
+        "worker": "node worker/monitor.js",
+        "prisma:generate": "prisma generate",
+        "prisma:push": "prisma db push"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.22.0",
+        "dotenv": "^16.4.5",
+        "next": "^16.3.3",
+        "nodemailer": "^9.0.6",
+        "ping": "^0.4.4",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "prisma": "^5.22.0"
+    }
+}

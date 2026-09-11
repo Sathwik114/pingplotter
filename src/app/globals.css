@@ -1,0 +1,340 @@
+:root {
+  --color-bg: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-border: #e2e6ec;
+  --color-text: #1a1f2b;
+  --color-text-muted: #667085;
+  --color-primary: #3457d5;
+  --color-primary-dark: #263f9e;
+  --color-online: #16a34a;
+  --color-offline: #dc2626;
+  --color-unknown: #9aa2b1;
+  --radius: 10px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --sidebar-width: 240px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: inherit;
+}
+
+h1, h2, h3, h4, p {
+  margin: 0;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: 32px 40px;
+  max-width: calc(100vw - var(--sidebar-width));
+  width: calc(100vw - var(--sidebar-width));
+}
+
+.main-content:has(.full-width-dashboard) {
+  padding: 10px 24px;
+}
+
+.main-content:not(:has(.full-width-dashboard)):not(:has(.devices-page-wrapper)):not(:has(.alerts-page-wrapper)) {
+  max-width: 1200px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.page-header p {
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background: #fff;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg);
+}
+
+.btn-danger {
+  background: #fff;
+  border-color: #fecaca;
+  color: var(--color-offline);
+}
+
+.btn-danger:hover {
+  background: #fef2f2;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field.full {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.form-field input,
+.form-field select {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.form-field input:disabled,
+.form-field select:disabled {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  border-color: var(--color-border);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-online {
+  background: #dcfce7;
+  color: var(--color-online);
+}
+
+.badge-offline {
+  background: #fee2e2;
+  color: var(--color-offline);
+}
+
+.badge-unknown {
+  background: #eef0f4;
+  color: var(--color-unknown);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.error-text {
+  color: var(--color-offline);
+  font-size: 13px;
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* Device Table scroll container rules for Monitor Devices page */
+.main-content:has(.full-width-dashboard),
+.main-content:has(.devices-page-wrapper),
+.main-content:has(.alerts-page-wrapper) {
+  padding: 10px 24px;
+}
+
+.main-content:has(.devices-page-wrapper),
+.main-content:has(.alerts-page-wrapper) {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.devices-page-wrapper,
+.alerts-page-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.devices-filter-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  z-index: 20;
+}
+
+.devices-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  margin-bottom: 5px; /* keeps scrollbar 5px above bottom of content container */
+}
+
+.table-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.table-scroll-container table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-scroll-container thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  z-index: 10;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.table-scroll-container th,
+.table-scroll-container td {
+  border-right: 1px solid var(--color-border);
+  padding: 6px 10px;
+}
+
+.table-scroll-container th {
+  font-size: 11px;
+}
+
+.table-scroll-container td {
+  font-size: 13px;
+}
+
+.table-scroll-container th:last-child,
+.table-scroll-container td:last-child {
+  border-right: none;
+}
+
+.table-scroll-container .btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.table-scroll-container tr.offline-row td {
+  background-color: #fee2e2; /* Light red/rose */
+}
+
+.table-scroll-container tr.offline-row:hover td {
+  background-color: #fca5a5; /* Slightly darker light red on hover */
+}

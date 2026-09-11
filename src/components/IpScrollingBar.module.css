@@ -1,0 +1,118 @@
+.container {
+  width: 100%;
+  overflow: hidden;
+  padding: 8px 0;
+  margin-top: 10px;
+  background: transparent;
+}
+
+.marqueeWrapper {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+}
+
+/* Subtle fade gradients on edges */
+.marqueeWrapper::before,
+.marqueeWrapper::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 30px;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.marqueeWrapper::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg), transparent);
+}
+
+.marqueeWrapper::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg), transparent);
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  animation: scroll 70s linear infinite;
+}
+
+.marqueeTrack:hover {
+  animation-play-state: paused;
+}
+
+.card {
+  flex-shrink: 0;
+  width: 120px;
+  height: 100px;
+  background: #f8fafc;
+  border: 1px solid #136f7563;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  margin-right: 10px; /* Margin on the right of every card to ensure perfect alignment in marquee */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: #2b104e;
+  background-color: #f8e6fa;
+  transform: translateY(-1px);
+}
+
+.imageContainer {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.statusImage {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.deviceIp {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  font-family: monospace;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deviceName {
+  font-size: 9px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+

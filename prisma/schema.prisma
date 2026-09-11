@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Device {
+  id               String        @id @default(cuid())
+  name             String
+  ipAddress        String        @unique
+  department       String?
+  location         String?
+  alertEmail       String
+  image            String?       // relative URL path to uploaded device image, e.g. /uploads/device-xxx.png
+  pingInterval     Int           @default(60) // seconds
+  failureThreshold Int           @default(3)  // consecutive failures before "Offline"
+  enabled          Boolean       @default(true)
+  status           String        @default("UNKNOWN") // UNKNOWN | ONLINE | OFFLINE
+  responseTime     Int?
+  failureCount     Int           @default(0)
+  lastCheckedAt    DateTime?
+  uptimePercentage Float         @default(100)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  pingHistories    PingHistory[]
+  alertLogs        AlertLog[]
+}
+
+model PingHistory {
+  id           String   @id @default(cuid())
+  deviceId     String
+  success      Boolean
+  responseTime Int?
+  checkedAt    DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  deviceId  String
+  status    String   // "Offline" | "Recovery"
+  email     String
+  result    String   // "Sent" | "Failed"
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+}
+
+model Settings {
+  id                      String   @id @default(cuid())
+  defaultPingInterval     Int      @default(60)
+  defaultFailureThreshold Int      @default(3)
+  smtpHost                String?
+  smtpPort                Int?
+  smtpUser                String?
+  smtpPassword            String?
+  senderEmail             String?
+  dailyReportTime         String?  @default("08:00")
+  monitoringEnabled       Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+}
