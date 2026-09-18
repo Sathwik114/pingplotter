@@ -29,10 +29,11 @@ const fs = require("fs");
 const path = require("path");
 
 const prisma = new PrismaClient();
+const workerLockPath = path.resolve(__dirname, ".monitor.lock");
 
 const SYNC_INTERVAL_MS = 15_000;
 const MAX_CONCURRENT_CHECKS = Math.max(
-  Number(process.env.MONITOR_CONCURRENCY) || 8,
+  Number(process.env.MONITOR_CONCURRENCY) || 3,
   1
 );
 
@@ -41,6 +42,63 @@ const activeTimers = new Map();
 const pendingChecks = [];
 const inFlightChecks = new Map();
 let runningChecks = 0;
+let syncInProgress = false;
+
+function getUploadsDirectories() {
+  return [
+    process.env.UPLOADS_DIR,
+    path.resolve(__dirname, "..", "public", "uploads"),
+  ].filter((directory, index, directories) =>
+    directory && directories.indexOf(directory) === index
+  );
+}
+
+function getImageFilePath(imagePath) {
+  if (!imagePath) return null;
+
+  if (path.isAbsolute(imagePath)) {
+    return fs.existsSync(imagePath) ? imagePath : null;
+  }
+
+  const filename = path.basename(imagePath);
+  return (
+    getUploadsDirectories()
+      .map((uploadsDir) => path.join(uploadsDir, filename))
+      .find((candidate) => fs.existsSync(candidate)) || null
+  );
+}
+
+function acquireWorkerLock() {
+  try {
+    if (fs.existsSync(workerLockPath)) {
+      const lockPid = Number(fs.readFileSync(workerLockPath, "utf8"));
+      if (lockPid && lockPid !== process.pid) {
+        try {
+          process.kill(lockPid, 0);
+          throw new Error(`another worker is already running (PID ${lockPid})`);
+        } catch (err) {
+          if (err.message.startsWith("another worker")) throw err;
+        }
+      }
+    }
+
+    fs.writeFileSync(workerLockPath, String(process.pid), { flag: "w" });
+  } catch (err) {
+    console.error(`[worker] Cannot start: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function releaseWorkerLock() {
+  try {
+    if (fs.existsSync(workerLockPath)) {
+      const lockPid = Number(fs.readFileSync(workerLockPath, "utf8"));
+      if (lockPid === process.pid) fs.unlinkSync(workerLockPath);
+    }
+  } catch (err) {
+    console.error(`[worker] Failed to release lock: ${err.message}`);
+  }
+}
 
 function drainCheckQueue() {
   while (runningChecks < MAX_CONCURRENT_CHECKS && pendingChecks.length > 0) {
@@ -113,20 +171,16 @@ async function sendMail({ to, subject, text, html, imagePath }) {
 
     const attachments = [];
     if (imagePath && html) {
-      // Strip leading slash so path.join works correctly on Windows
-      const relPath = imagePath.replace(/^\/+/, "");
-      const absoluteImagePath = path.join(
-        process.env.UPLOADS_DIR || path.resolve(__dirname, "..", "public", "uploads"),
-        path.basename(imagePath)
-      );
-      console.log(`[worker] Looking for device image to attach at: ${absoluteImagePath}`);
+      const absoluteImagePath = getImageFilePath(imagePath);
+      console.log(`[worker] Looking for device image to attach at: ${absoluteImagePath || imagePath}`);
 
-      if (fs.existsSync(absoluteImagePath)) {
+      if (absoluteImagePath) {
         try {
           const filename = path.basename(absoluteImagePath);
           attachments.push({
-            filename: filename,
-            path: absoluteImagePath,
+            filename,
+            content: fs.readFileSync(absoluteImagePath),
+            contentType: `image/${path.extname(filename).slice(1).toLowerCase().replace("jpg", "jpeg")}`,
             cid: "device-image", // references cid:device-image in the html img src
           });
           console.log(`[worker] Attached device image (${filename}) as CID attachment.`);
@@ -225,13 +279,16 @@ async function performCheck(deviceId) {
       uptimePercentage,
     },
   });
+  console.log(
+    `[worker] ${device.name} (${device.ipAddress}) ping=${alive ? "ONLINE" : "OFFLINE"} ` +
+      `status=${newStatus} failures=${newFailureCount}/${device.failureThreshold}`
+  );
 
   // Device image section if it exists or matches by IP address
   let resolvedImagePath = device.image;
   if (!resolvedImagePath) {
-    const uploadsDir =
-      process.env.UPLOADS_DIR || path.resolve(__dirname, "..", "public", "uploads");
-    if (fs.existsSync(uploadsDir)) {
+    for (const uploadsDir of getUploadsDirectories()) {
+      if (!fs.existsSync(uploadsDir)) continue;
       try {
         const files = fs.readdirSync(uploadsDir);
         const cleanIp = device.ipAddress.replace(/[^0-9a-zA-Z.]/g, "_");
@@ -243,6 +300,7 @@ async function performCheck(deviceId) {
         });
         if (matchingFile) {
           resolvedImagePath = `/uploads/${matchingFile}`;
+          break;
         }
       } catch (err) {
         console.error("[worker] Error reading uploads directory:", err.message);
@@ -250,12 +308,14 @@ async function performCheck(deviceId) {
     }
   }
 
+  const hasDeviceImage = Boolean(getImageFilePath(resolvedImagePath));
+
   const imageCellHtml = `
       <td style="width: 170px; vertical-align: top; padding-left: 16px;">
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
           <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Device Photo</p>
           ${
-            resolvedImagePath
+            hasDeviceImage
               ? `<img src="cid:device-image" alt="Device image" style="width: 100%; max-height: 170px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" />`
               : `<div style="background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 24px 8px; margin-top: 4px;">
                    <div style="font-size: 28px; line-height: 1; margin-bottom: 4px;">📷</div>
@@ -345,7 +405,7 @@ async function performCheck(deviceId) {
       subject: `[ALERT] ${device.name} is Offline`,
       text: plainText,
       html: htmlBody,
-      imagePath: resolvedImagePath || null,
+      imagePath: hasDeviceImage ? resolvedImagePath : null,
     });
     await prisma.alertLog.create({
       data: {
@@ -434,7 +494,7 @@ async function performCheck(deviceId) {
       subject: `[RECOVERY] ${device.name} is back Online`,
       text: plainText,
       html: htmlBody,
-      imagePath: resolvedImagePath || null,
+      imagePath: hasDeviceImage ? resolvedImagePath : null,
     });
     await prisma.alertLog.create({
       data: {
@@ -471,39 +531,47 @@ function stopTimer(deviceId) {
 }
 
 async function syncTimers() {
-  const settings = await getSettings();
+  if (syncInProgress) return;
+  syncInProgress = true;
 
-  if (!settings.monitoringEnabled) {
-    if (activeTimers.size > 0) {
-      console.log("[worker] Monitoring disabled in Settings — pausing all timers.");
-      for (const id of activeTimers.keys()) stopTimer(id);
+  try {
+    const settings = await getSettings();
+
+    if (!settings.monitoringEnabled) {
+      if (activeTimers.size > 0) {
+        console.log("[worker] Monitoring disabled in Settings — pausing all timers.");
+        for (const id of activeTimers.keys()) stopTimer(id);
+      }
+      return;
     }
-    return;
-  }
 
-  const devices = await prisma.device.findMany({ where: { enabled: true } });
-  const currentIds = new Set(devices.map((d) => d.id));
+    const devices = await prisma.device.findMany({ where: { enabled: true } });
+    const currentIds = new Set(devices.map((d) => d.id));
 
-  // Stop timers for devices that were deleted or disabled
-  for (const id of activeTimers.keys()) {
-    if (!currentIds.has(id)) stopTimer(id);
-  }
-
-  // Start/restart timers for new devices or ones whose interval changed
-  for (const device of devices) {
-    const existing = activeTimers.get(device.id);
-    if (!existing) {
-      startTimer(device);
-      console.log(`[worker] Started monitoring "${device.name}" every ${device.pingInterval}s`);
-    } else if (existing.intervalSeconds !== device.pingInterval) {
-      stopTimer(device.id);
-      startTimer(device);
-      console.log(`[worker] Restarted "${device.name}" with new interval ${device.pingInterval}s`);
+    // Stop timers for devices that were deleted or disabled
+    for (const id of activeTimers.keys()) {
+      if (!currentIds.has(id)) stopTimer(id);
     }
+
+    // Start/restart timers for new devices or ones whose interval changed
+    for (const device of devices) {
+      const existing = activeTimers.get(device.id);
+      if (!existing) {
+        startTimer(device);
+        console.log(`[worker] Started monitoring "${device.name}" every ${device.pingInterval}s`);
+      } else if (existing.intervalSeconds !== device.pingInterval) {
+        stopTimer(device.id);
+        startTimer(device);
+        console.log(`[worker] Restarted "${device.name}" with new interval ${device.pingInterval}s`);
+      }
+    }
+  } finally {
+    syncInProgress = false;
   }
 }
 
 async function main() {
+  acquireWorkerLock();
   console.log("[worker] Network monitor worker starting...");
   await syncTimers();
   setInterval(() => {
@@ -519,6 +587,14 @@ main().catch((err) => {
 process.on("SIGINT", async () => {
   console.log("\n[worker] Shutting down...");
   for (const id of activeTimers.keys()) stopTimer(id);
+  releaseWorkerLock();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  for (const id of activeTimers.keys()) stopTimer(id);
+  releaseWorkerLock();
   await prisma.$disconnect();
   process.exit(0);
 });
