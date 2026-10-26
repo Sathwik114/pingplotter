@@ -14,7 +14,9 @@ model Device {
   department       String?
   location         String?
   alertEmail       String
-  image            String?       // relative URL path to uploaded device image, e.g. /uploads/device-xxx.png
+  image            String?       // URL path to image (e.g. /api/devices/[id]/image)
+  imageData        Bytes?        // Binary image data stored directly in DB
+  imageMimeType    String?       // MIME type of image, e.g. "image/png", "image/jpeg"
   pingInterval     Int           @default(60) // seconds
   failureThreshold Int           @default(3)  // consecutive failures before "Offline"
   enabled          Boolean       @default(true)

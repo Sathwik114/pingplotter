@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 
@@ -18,21 +18,32 @@ const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"
 
 /* ─── Main component ──────────────────────────────────────────────────── */
 
-export default function AlertMailList({ alerts, initialSearch = "" }) {
+export default function AlertMailList({
+  alerts = [],
+  initialSearch = "",
+  initialMonth = "all",
+  initialYear = "",
+}) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState(initialSearch);
-  const [month, setMonth] = useState(MONTH_NAMES[new Date().getMonth()]);
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  // When opened from a specific device (has an initialSearch/IP), the IP
-  // field is locked so the user can't accidentally search a different IP.
+  const [month, setMonth] = useState(initialMonth);
+  const [year, setYear] = useState(initialYear);
+  // When opened with an initialSearch, lock the field unless it's empty
   const ipLocked = Boolean(initialSearch);
 
   const filtered = alerts.filter((a) => {
-    if (filter === "offline" && a.status !== "Offline") return false;
-    if (filter === "recovery" && a.status !== "Recovery") return false;
+    const isOffline = Boolean(a.status && a.status.toLowerCase().includes("offline"));
+    const isRecovery = Boolean(
+      a.status && (a.status.toLowerCase().includes("recovery") || a.status.toLowerCase().includes("online"))
+    );
+
+    if (filter === "offline" && !isOffline) return false;
+    if (filter === "recovery" && !isRecovery) return false;
+
     const d = new Date(a.createdAt);
     if (month !== "all" && MONTH_NAMES[d.getMonth()] !== month) return false;
     if (year !== "" && String(d.getFullYear()) !== String(year)) return false;
+
     if (search) {
       const q = search.toLowerCase();
       const haystack = `${a.device?.name || ""} ${a.device?.ipAddress || ""} ${a.email || ""}`.toLowerCase();
@@ -40,6 +51,11 @@ export default function AlertMailList({ alerts, initialSearch = "" }) {
     }
     return true;
   });
+
+  const offlineCount = alerts.filter((a) => a.status && a.status.toLowerCase().includes("offline")).length;
+  const recoveryCount = alerts.filter(
+    (a) => a.status && (a.status.toLowerCase().includes("recovery") || a.status.toLowerCase().includes("online"))
+  ).length;
 
   if (alerts.length === 0) {
     return (
@@ -66,14 +82,14 @@ export default function AlertMailList({ alerts, initialSearch = "" }) {
           onClick={() => setFilter("offline")}
           style={{ fontSize: 12, padding: "5px 12px" }}
         >
-          Offline ({alerts.filter((a) => a.status === "Offline").length})
+          Offline ({offlineCount})
         </button>
         <button
           className={`btn ${filter === "recovery" ? "btn-success" : "btn-secondary"}`}
           onClick={() => setFilter("recovery")}
           style={{ fontSize: 12, padding: "5px 12px" }}
         >
-          Recovery ({alerts.filter((a) => a.status === "Recovery").length})
+          Recovery ({recoveryCount})
         </button>
 
         <select
@@ -171,12 +187,33 @@ export default function AlertMailList({ alerts, initialSearch = "" }) {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: "30px 20px", textAlign: "center", color: "#667085" }}>
-                    No alerts found matching current filters.
+                    <div style={{ marginBottom: "6px" }}>No alerts found matching current filters.</div>
+                    {(filter !== "all" || month !== "all" || year !== "" || (search && !ipLocked)) && (
+                      <button
+                        onClick={() => {
+                          setFilter("all");
+                          setMonth("all");
+                          setYear("");
+                          if (!ipLocked) setSearch("");
+                        }}
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--color-primary, #3457d5)",
+                          background: "none",
+                          border: "none",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Reset filters to view all ({alerts.length}) alerts
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
                 filtered.map((a) => {
-                  const isOffline = a.status === "Offline";
+                  const isOffline = Boolean(a.status && a.status.toLowerCase().includes("offline"));
                   const accent = isOffline ? "#dc2626" : "#16a34a";
                   const accentBg = isOffline ? "#fef2f2" : "#f0fdf4";
                   return (

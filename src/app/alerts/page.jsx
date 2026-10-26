@@ -4,7 +4,8 @@ import AlertMailList from "./AlertMailList";
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage({ searchParams }) {
-  const initialSearch = searchParams?.search || searchParams?.ip || "";
+  const resolvedSearchParams = await searchParams;
+  const initialSearch = resolvedSearchParams?.search || resolvedSearchParams?.ip || "";
 
   const alerts = await prisma.alertLog.findMany({
     orderBy: { createdAt: "desc" },
@@ -12,11 +13,11 @@ export default async function AlertsPage({ searchParams }) {
     include: {
       device: {
         select: {
+          id: true,
           name: true,
           ipAddress: true,
           department: true,
           location: true,
-          image: true,
           failureThreshold: true,
         },
       },

@@ -18,11 +18,12 @@ async function getIrisDashboardData() {
   });
 
   const devicesWithLogs = devices.map((device) => {
-    const lastOffline = device.alertLogs.find((a) => a.status === "Offline");
-    const lastRecovery = device.alertLogs.find((a) => a.status === "Recovery");
+    const lastOffline = device.alertLogs.find((a) => a.status && a.status.toLowerCase().includes("offline"));
+    const lastRecovery = device.alertLogs.find((a) => a.status && (a.status.toLowerCase().includes("recovery") || a.status.toLowerCase().includes("online")));
+    const { imageData, ...safeDevice } = device;
 
     return {
-      ...device,
+      ...safeDevice,
       createdAt: device.createdAt.toISOString(),
       updatedAt: device.updatedAt.toISOString(),
       lastCheckedAt: device.lastCheckedAt ? device.lastCheckedAt.toISOString() : null,

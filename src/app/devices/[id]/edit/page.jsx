@@ -1,42 +1,40 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { getUploadsDir } from "@/lib/uploads";
-import fs from "fs";
-import path from "path";
 import EditDeviceForm from "./EditDeviceForm";
 
 export const dynamic = "force-dynamic";
-
-function resolveDeviceImage(device) {
-  if (device.image) return device.image;
-
-  const uploadsDir = getUploadsDir();
-  if (!fs.existsSync(uploadsDir)) return null;
-
-  const cleanIp = device.ipAddress.replace(/[^0-9a-zA-Z.]/g, "_");
-  const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]);
-  const matchingFile = fs.readdirSync(uploadsDir).find((file) => {
-    const extension = path.extname(file).toLowerCase();
-    return imageExtensions.has(extension) && path.basename(file, extension) === cleanIp;
-  });
-
-  return matchingFile ? `/uploads/${matchingFile}` : null;
-}
 
 export default async function EditDevicePage({ params }) {
   const { id } = await params;
 
   const device = await prisma.device.findUnique({
     where: { id },
+    select: {
+      id: true,
+      name: true,
+      ipAddress: true,
+      department: true,
+      location: true,
+      alertEmail: true,
+      imageData: true,
+      pingInterval: true,
+      failureThreshold: true,
+      enabled: true,
+      status: true,
+      updatedAt: true,
+    },
   });
 
   if (!device) {
     notFound();
   }
 
-  const deviceWithImage = {
+  // Use dynamic timestamp for cache-busting so browser always loads the latest DB image
+  const cacheBust = device.updatedAt ? new Date(device.updatedAt).getTime() : Date.now();
+  const deviceForClient = {
     ...device,
-    image: resolveDeviceImage(device),
+    image: device.imageData ? `/api/devices/${device.id}/image?t=${cacheBust}` : null,
+    imageData: undefined,
   };
 
   return (
@@ -47,7 +45,7 @@ export default async function EditDevicePage({ params }) {
       </div>
 
       <div className="card">
-        <EditDeviceForm device={deviceWithImage} />
+        <EditDeviceForm device={deviceForClient} />
       </div>
     </>
   );

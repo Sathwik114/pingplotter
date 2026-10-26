@@ -15,11 +15,12 @@ export default async function MailPage() {
     include: {
       device: {
         select: {
+          id: true,
           name: true,
           ipAddress: true,
           department: true,
           location: true,
-          image: true,
+          imageMimeType: true,
           failureThreshold: true,
         },
       },
@@ -30,6 +31,14 @@ export default async function MailPage() {
   const serialised = alerts.map((a) => ({
     ...a,
     createdAt: a.createdAt.toISOString(),
+    device: a.device
+      ? {
+          ...a.device,
+          image: a.device.imageMimeType
+            ? `/api/devices/${a.device.id}/image`
+            : null,
+        }
+      : null,
   }));
 
   return (

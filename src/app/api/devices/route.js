@@ -1,45 +1,42 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
-import { getUploadFilePath, getUploadsDir } from "@/lib/uploads";
-import fs from "fs";
-import path from "path";
 
-/**
- * Saves a base64-encoded image to public/uploads/ and returns its relative URL path.
- * Returns null if no imageData is provided.
- */
-function saveImage(imageData, oldImagePath, ipAddress) {
-  if (!imageData) return null;
-
-  // Delete old image if it exists
-  if (oldImagePath) {
-    try {
-      const oldFullPath = getUploadFilePath(oldImagePath);
-      if (fs.existsSync(oldFullPath)) fs.unlinkSync(oldFullPath);
-    } catch (_) {}
-  }
-
-  // imageData is expected as "data:<mime>;base64,<data>"
-  const matches = imageData.match(/^data:([A-Za-z0-9+/]+\/[A-Za-z0-9+/]+);base64,(.+)$/);
-  if (!matches) return null;
-
-  const mimeType = matches[1];
-  const base64Data = matches[2];
-  const ext = mimeType.split("/")[1].replace("jpeg", "jpg");
-  const cleanIp = ipAddress.replace(/[^0-9a-zA-Z.]/g, "_");
-  const filename = `${cleanIp}.${ext}`;
-  const uploadsDir = getUploadsDir();
-
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-  fs.writeFileSync(path.join(uploadsDir, filename), Buffer.from(base64Data, "base64"));
-  return `/uploads/${filename}`;
-}
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const devices = await prisma.device.findMany({ orderBy: { createdAt: "desc" } });
-  return NextResponse.json(devices);
+  const devices = await prisma.device.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      ipAddress: true,
+      department: true,
+      location: true,
+      alertEmail: true,
+      imageMimeType: true,
+      pingInterval: true,
+      failureThreshold: true,
+      enabled: true,
+      status: true,
+      responseTime: true,
+      failureCount: true,
+      lastCheckedAt: true,
+      uptimePercentage: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  // Dynamically compute the image URL from database image data — DB image column stays empty
+  const formattedDevices = devices.map((d) => ({
+    ...d,
+    image: d.imageMimeType
+      ? `/api/devices/${d.id}/image?t=${new Date(d.updatedAt).getTime()}`
+      : null,
+  }));
+
+  return NextResponse.json(formattedDevices);
 }
 
 export async function POST(request) {
@@ -62,8 +59,39 @@ export async function POST(request) {
     );
   }
 
+  let binaryBuffer = null;
+  let mimeType = null;
+
+  // Process image purely in memory — zero disk/filesystem writes
+  if (imageData && typeof imageData === "string" && imageData.length > 20) {
+    let detectedMime = "image/png";
+    let base64String = imageData;
+
+    if (imageData.startsWith("data:")) {
+      const commaIdx = imageData.indexOf(",");
+      if (commaIdx !== -1) {
+        const header = imageData.substring(5, commaIdx);
+        detectedMime = header.split(";")[0].toLowerCase().trim() || "image/png";
+        base64String = imageData.substring(commaIdx + 1);
+      }
+    }
+
+    // Security: Only accept valid image MIME types
+    if (detectedMime.startsWith("image/")) {
+      try {
+        const buffer = Buffer.from(base64String, "base64");
+        // Limit maximum image size to 5MB
+        if (buffer.length > 0 && buffer.length <= 5 * 1024 * 1024) {
+          binaryBuffer = buffer;
+          mimeType = detectedMime;
+        }
+      } catch (err) {
+        console.error("Image decode error:", err);
+      }
+    }
+  }
+
   const settings = await getSettings();
-  const imagePath = saveImage(imageData, null, ipAddress);
 
   try {
     const device = await prisma.device.create({
@@ -73,7 +101,9 @@ export async function POST(request) {
         department: department || null,
         location: location || null,
         alertEmail,
-        image: imagePath,
+        image: null, // Keep image column empty in the database
+        imageData: binaryBuffer,
+        imageMimeType: mimeType,
         pingInterval: pingInterval || settings.defaultPingInterval,
         failureThreshold: failureThreshold || settings.defaultFailureThreshold,
         enabled: true,
@@ -81,14 +111,16 @@ export async function POST(request) {
       },
     });
 
+    // Provide dynamic URL in API response for the frontend
+    device.image = binaryBuffer
+      ? `/api/devices/${device.id}/image?t=${Date.now()}`
+      : null;
+
+    // Do not return raw binary in JSON response
+    delete device.imageData;
+
     return NextResponse.json(device, { status: 201 });
   } catch (err) {
-    // Clean up uploaded image if DB insert fails
-    if (imagePath) {
-      try {
-        fs.unlinkSync(getUploadFilePath(imagePath));
-      } catch (_) {}
-    }
     if (err.code === "P2002") {
       return NextResponse.json(
         { error: "A device with this IP address already exists." },

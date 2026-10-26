@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function EditDeviceForm({ device }) {
@@ -30,6 +30,12 @@ export default function EditDeviceForm({ device }) {
   const [removeImage, setRemoveImage] = useState(false);  // flag to delete existing image
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setImagePreview(device.image || null);
+    setImageBase64(null);
+    setRemoveImage(false);
+  }, [device.image]);
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
@@ -90,8 +96,8 @@ export default function EditDeviceForm({ device }) {
         return;
       }
 
-      router.push("/devices");
       router.refresh();
+      router.push("/devices");
     } catch (err) {
       setError("Something went wrong. Please try again.");
       setSaving(false);

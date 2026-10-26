@@ -43,6 +43,8 @@ const pendingChecks = [];
 const inFlightChecks = new Map();
 let runningChecks = 0;
 let syncInProgress = false;
+// Set of device IDs whose first check has completed since worker/server startup
+const checkedSinceStartup = new Set();
 
 function getImageFilePath(imagePath) {
   if (!imagePath) return null;
@@ -132,7 +134,7 @@ async function getSettings() {
  * @param {string|null} opts.imagePath - Relative URL path from DB, e.g. /uploads/device-123.png
  * @returns {Promise<boolean>}
  */
-async function sendMail({ to, subject, text, html, imagePath }) {
+async function sendMail({ to, subject, text, html, imageData, imageMimeType, imageName, imagePath }) {
   try {
     const host = process.env.SMTP_HOST;
     const parsedPort = Number(process.env.SMTP_PORT);
@@ -159,10 +161,16 @@ async function sendMail({ to, subject, text, html, imagePath }) {
     });
 
     const attachments = [];
-    if (imagePath && html) {
+    if (imageData && html) {
+      attachments.push({
+        filename: imageName || "device.png",
+        content: imageData,
+        contentType: imageMimeType || "image/png",
+        cid: "device-image",
+      });
+      console.log(`[worker] Attached device image from DB (${imageName || 'device.png'}) as CID attachment.`);
+    } else if (imagePath && html) {
       const absoluteImagePath = getImageFilePath(imagePath);
-      console.log(`[worker] Looking for device image to attach at: ${absoluteImagePath}`);
-
       if (fs.existsSync(absoluteImagePath)) {
         try {
           const filename = path.basename(absoluteImagePath);
@@ -170,14 +178,12 @@ async function sendMail({ to, subject, text, html, imagePath }) {
             filename,
             content: fs.readFileSync(absoluteImagePath),
             contentType: `image/${path.extname(filename).slice(1).toLowerCase().replace("jpg", "jpeg")}`,
-            cid: "device-image", // references cid:device-image in the html img src
+            cid: "device-image",
           });
-          console.log(`[worker] Attached device image (${filename}) as CID attachment.`);
+          console.log(`[worker] Attached device image (${filename}) from disk as CID attachment.`);
         } catch (imgErr) {
           console.error("[worker] Failed to attach device image:", imgErr.message);
         }
-      } else {
-        console.warn(`[worker] Device image not found on disk: ${absoluteImagePath}`);
       }
     }
 
@@ -231,6 +237,9 @@ async function performCheck(deviceId) {
   const device = await prisma.device.findUnique({ where: { id: deviceId } });
   if (!device || !device.enabled) return;
 
+  const isFirstCheckSinceStartup = !checkedSinceStartup.has(device.id);
+  checkedSinceStartup.add(device.id);
+
   const { alive, time } = await pingHost(device.ipAddress);
 
   await prisma.pingHistory.create({
@@ -273,60 +282,39 @@ async function performCheck(deviceId) {
       `status=${newStatus} failures=${newFailureCount}/${device.failureThreshold}`
   );
 
-  // Device image section if it exists or matches by IP address
-  let resolvedImagePath = device.image;
-  if (!resolvedImagePath) {
-    const uploadsDir =
-      process.env.UPLOADS_DIR || path.resolve(__dirname, "..", "public", "uploads");
-    if (fs.existsSync(uploadsDir)) {
-      try {
-        const files = fs.readdirSync(uploadsDir);
-        const cleanIp = device.ipAddress.replace(/[^0-9a-zA-Z.]/g, "_");
-        const matchingFile = files.find(file => {
-          const ext = path.extname(file).toLowerCase();
-          if (![".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext)) return false;
-          const nameWithoutExt = path.basename(file, ext);
-          return nameWithoutExt === cleanIp || nameWithoutExt === device.ipAddress;
-        });
-        if (matchingFile) {
-          resolvedImagePath = `/uploads/${matchingFile}`;
-        }
-      } catch (err) {
-        console.error("[worker] Error reading uploads directory:", err.message);
-      }
-    }
-  }
-
-  let imageUnavailable = false;
-  if (resolvedImagePath && !fs.existsSync(getImageFilePath(resolvedImagePath))) {
-    imageUnavailable = true;
-    console.warn(
-      `[worker] Device image is missing on disk; sending alert without photo.`
-    );
-    resolvedImagePath = null;
-  }
+  // Device image from database binary or fallback
+  const hasDbImage = Boolean(device.imageData && device.imageData.length > 0);
+  const imageExt = (device.imageMimeType || "image/png").split("/")[1] || "png";
+  const imageName = `${device.ipAddress}.${imageExt}`;
 
   const imageCellHtml = `
       <td style="width: 170px; vertical-align: top; padding-left: 16px;">
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
           <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Device Photo</p>
           ${
-            resolvedImagePath
+            hasDbImage
               ? `<img src="cid:device-image" alt="Device image" style="width: 100%; max-height: 170px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" />`
               : `<div style="background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 24px 8px; margin-top: 4px;">
                    <div style="font-size: 28px; line-height: 1; margin-bottom: 4px;">📷</div>
-                      <span style="font-size: 11px; font-weight: 600; color: #64748b;">
-                        ${imageUnavailable ? "Image unavailable" : "No Photo"}
-                      </span>
+                      <span style="font-size: 11px; font-weight: 600; color: #64748b;">No Photo</span>
                     </div>`
           }
         </div>
       </td>`;
 
-  // State transition: Online -> Offline
-  if (newStatus === "OFFLINE" && !wasOffline) {
+  // Trigger offline alert on normal transition OR on server restart verification
+  const isOfflineTransition = newStatus === "OFFLINE" && !wasOffline;
+  const isStartupOfflineAlert = isFirstCheckSinceStartup && newStatus === "OFFLINE";
+
+  if (isOfflineTransition || isStartupOfflineAlert) {
     const alertTime = new Date().toLocaleString();
-    const plainText = `Device "${device.name}" (${device.ipAddress}) failed to respond after ${device.failureThreshold} attempts as of ${alertTime}.`;
+    const isRestartAlert = isStartupOfflineAlert && wasOffline;
+    const alertSubject = isRestartAlert
+      ? `[ALERT] ${device.name} is Offline (Post-Restart Notification)`
+      : `[ALERT] ${device.name} is Offline`;
+    const plainText = isRestartAlert
+      ? `[Server Restart Alert] Device "${device.name}" (${device.ipAddress}) is currently OFFLINE as of ${alertTime}.`
+      : `Device "${device.name}" (${device.ipAddress}) failed to respond after ${device.failureThreshold} attempts as of ${alertTime}.`;
     const htmlBody = `
       <div style="background-color: #f8fafc; padding: 30px 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
@@ -400,15 +388,17 @@ async function performCheck(deviceId) {
  
     const sent = await sendMail({
       to: device.alertEmail,
-      subject: `[ALERT] ${device.name} is Offline`,
+      subject: alertSubject,
       text: plainText,
       html: htmlBody,
-      imagePath: resolvedImagePath || null,
+      imageData: device.imageData,
+      imageMimeType: device.imageMimeType,
+      imageName,
     });
     await prisma.alertLog.create({
       data: {
         deviceId: device.id,
-        status: "Offline",
+        status: isRestartAlert ? "Offline (Restart Alert)" : "Offline",
         email: device.alertEmail,
         result: sent ? "Sent" : "Failed",
       },
@@ -492,7 +482,9 @@ async function performCheck(deviceId) {
       subject: `[RECOVERY] ${device.name} is back Online`,
       text: plainText,
       html: htmlBody,
-      imagePath: resolvedImagePath || null,
+      imageData: device.imageData,
+      imageMimeType: device.imageMimeType,
+      imageName,
     });
     await prisma.alertLog.create({
       data: {
