@@ -6,8 +6,9 @@ import Sidebar from "./Sidebar";
 export default function AppLayout({ children }) {
   const pathname = usePathname();
   const isIrisDashboard = pathname === "/hr/ping/iris";
+  const isLoginPage = pathname === "/login";
 
-  if (isIrisDashboard) {
+  if (isIrisDashboard || isLoginPage) {
     return <main style={{ width: "100%", minHeight: "100vh", padding: 0, margin: 0 }}>{children}</main>;
   }
 

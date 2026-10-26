@@ -309,9 +309,7 @@ async function performCheck(deviceId) {
   if (isOfflineTransition || isStartupOfflineAlert) {
     const alertTime = new Date().toLocaleString();
     const isRestartAlert = isStartupOfflineAlert && wasOffline;
-    const alertSubject = isRestartAlert
-      ? `[ALERT] ${device.name} is Offline (Post-Restart Notification)`
-      : `[ALERT] ${device.name} is Offline`;
+    const alertSubject = `[ALERT] ${device.name} is Offline`;
     const plainText = isRestartAlert
       ? `[Server Restart Alert] Device "${device.name}" (${device.ipAddress}) is currently OFFLINE as of ${alertTime}.`
       : `Device "${device.name}" (${device.ipAddress}) failed to respond after ${device.failureThreshold} attempts as of ${alertTime}.`;

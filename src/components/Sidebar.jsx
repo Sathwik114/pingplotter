@@ -15,6 +15,13 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (_) {}
+    window.location.href = "/login";
+  };
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>IT PING PLOTTER</div>
@@ -38,6 +45,34 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Logout button at bottom of sidebar */}
+      <div style={{ marginTop: "auto", padding: "16px 12px 0", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            fontWeight: "500",
+            color: "#f87171",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        >
+          <span className={styles.icon}>🚪</span>
+          Sign Out
+        </button>
+      </div>
     </aside>
   );
 }
