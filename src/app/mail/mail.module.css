@@ -1,0 +1,337 @@
+/* ── Mail page shell ─────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: calc(100vh - 64px);
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Inbox sidebar ───────────────────────────────────────────── */
+.inbox {
+  width: 320px;
+  min-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  background: #fafbfc;
+}
+
+.inboxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inboxTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.inboxCount {
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* ── Filter tabs ─────────────────────────────────────────────── */
+.filterTabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.filterTab {
+  flex: 1;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.filterTab:hover {
+  background: var(--color-border);
+}
+
+.filterTabActive {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── Mail list ───────────────────────────────────────────────── */
+.mailList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.emptyInbox {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.mailItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.mailItem:hover {
+  background: #f0f4ff;
+}
+
+.mailItemActive {
+  background: #e8eeff !important;
+  border-left: 3px solid var(--color-primary);
+}
+
+/* Avatar */
+.mailAvatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mailAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mailAvatarIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Mail meta */
+.mailMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mailMetaTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.mailDevice {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mailTime {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.mailMetaBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mailStatus {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mailDelivery {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── Preview panel ───────────────────────────────────────────── */
+.preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.emptyPreview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.emptyPreviewIcon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+
+/* Preview header (To / Date) */
+.previewHeader {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fafbfc;
+}
+
+.previewDate {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.previewTo {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.previewToLabel {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+
+/* ── Email body card ─────────────────────────────────────────── */
+.emailBody {
+  margin: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Coloured top stripe */
+.emailHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--color-border);
+  border-left: 5px solid;
+}
+
+.emailIcon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.emailTitle {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.emailSubject {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Detail table */
+.emailContent {
+  padding: 20px 22px 24px;
+}
+
+.detailTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detailTable tr + tr td {
+  padding-top: 10px;
+}
+
+.detailLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: 160px;
+  padding-right: 16px;
+  vertical-align: top;
+}
+
+.detailValue {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+/* Status / delivery pills */
+.statusPill,
+.deliveryPill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Device image */
+.deviceImageWrap {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.deviceImageLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.deviceImage {
+  max-width: 320px;
+  max-height: 220px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+  display: block;
+}
