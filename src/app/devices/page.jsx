@@ -24,11 +24,31 @@ export default async function DevicesPage() {
       uptimePercentage: true,
       createdAt: true,
       updatedAt: true,
+      alertLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      },
     },
   });
 
   const formattedDevices = devices.map((d) => ({
     ...d,
+    alertLogs: d.alertLogs.map((log) => ({
+      ...log,
+      createdAt: log.createdAt.toISOString(),
+    })),
+    lastOfflineTime:
+      d.alertLogs.find(
+        (log) =>
+          log.status?.toLowerCase().includes("offline") &&
+          !log.status.toLowerCase().includes("daily")
+      )?.createdAt.toISOString() || null,
+    lastOnlineTime:
+      d.alertLogs.find((log) =>
+        ["recovery", "online"].some((status) =>
+          log.status?.toLowerCase().includes(status)
+        )
+      )?.createdAt.toISOString() || null,
     image: d.imageMimeType
       ? `/api/devices/${d.id}/image?t=${new Date(d.updatedAt).getTime()}`
       : null,

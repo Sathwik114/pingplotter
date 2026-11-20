@@ -1,6 +1,16 @@
 const AUTH_SECRET = process.env.AUTH_SECRET || "pingplotter_secret_jwt_key_2026_gti";
 export const AUTH_COOKIE_NAME = "ping_session";
 
+export function isSecureRequest(request) {
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    .trim()
+    .toLowerCase();
+
+  return new URL(request.url).protocol === "https:" || forwardedProto === "https";
+}
+
 async function getHmacKey() {
   const enc = new TextEncoder();
   return await crypto.subtle.importKey(
@@ -75,4 +85,3 @@ export async function verifySessionToken(token) {
     return null;
   }
 }
-

@@ -4,12 +4,22 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
+import AlertMailList from "@/app/alerts/AlertMailList";
+
+function formatDate(dateString) {
+  if (!dateString) return "Never";
+  return new Date(dateString).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 export default function DeviceTable({ devices }) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState(null);
   const [locationFilter, setLocationFilter] = useState("all");
   const [ipSearch, setIpSearch] = useState("");
+  const [selectedDevice, setSelectedDevice] = useState(null);
 
   const locations = useMemo(() => {
     const unique = new Set(devices.map((d) => d.location).filter(Boolean));
@@ -23,6 +33,18 @@ export default function DeviceTable({ devices }) {
       return matchLocation && matchIp;
     });
   }, [devices, locationFilter, ipSearch]);
+
+  const selectedDeviceLogs = selectedDevice
+    ? selectedDevice.alertLogs.map((log) => ({
+        ...log,
+        device: {
+          name: selectedDevice.name,
+          ipAddress: selectedDevice.ipAddress,
+          department: selectedDevice.department,
+          location: selectedDevice.location,
+        },
+      }))
+    : [];
 
   async function handleDelete(id, name) {
     if (!confirm(`Delete "${name}"? This also removes its history and alert logs.`)) {
@@ -84,7 +106,7 @@ export default function DeviceTable({ devices }) {
         </div>
       </div>
 
-      <div className="table-scroll-container">
+      <div className="table-scroll-container devices-monitor-table-scroll">
         <table>
           <thead>
             <tr>
@@ -96,13 +118,16 @@ export default function DeviceTable({ devices }) {
               <th><center>Response Time</center></th>
               <th><center>Last Checked</center></th>
               <th><center>Email</center></th>
+              <th><center>Recent Offline Time</center></th>
+              <th><center>Recent Online Time</center></th>
+              <th><center>Logs</center></th>
               <th><center>Action</center></th>
             </tr>
           </thead>
           <tbody>
             {filteredDevices.length === 0 ? (
               <tr>
-                <td colSpan={9} className="empty-state" style={{ padding: "24px", textAlign: "center", fontStyle: "italic", color: "var(--color-text-muted)" }}>
+                <td colSpan={12} className="empty-state" style={{ padding: "24px", textAlign: "center", fontStyle: "italic", color: "var(--color-text-muted)" }}>
                   No devices match the active filters.
                 </td>
               </tr>
@@ -126,6 +151,21 @@ export default function DeviceTable({ devices }) {
                       : "—"}
                   </td>
                   <td>{d.alertEmail}</td>
+                  <td className={d.lastOfflineTime ? "device-offline-time" : "device-history-empty"}>
+                    {formatDate(d.lastOfflineTime)}
+                  </td>
+                  <td className={d.lastOnlineTime ? "device-online-time" : "device-history-empty"}>
+                    {formatDate(d.lastOnlineTime)}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setSelectedDevice(d)}
+                    >
+                      Logs ({d.alertLogs.length})
+                    </button>
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
                       <Link href={`/devices/${d.id}/edit`} className="btn btn-secondary">
@@ -146,6 +186,42 @@ export default function DeviceTable({ devices }) {
           </tbody>
         </table>
       </div>
+
+      {selectedDevice && (
+        <div className="device-logs-modal-backdrop" onClick={() => setSelectedDevice(null)}>
+          <section
+            className="device-logs-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="device-logs-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="device-logs-modal-header">
+              <div>
+                <h2 id="device-logs-title">Alert Logs for {selectedDevice.name}</h2>
+                <p>IP: {selectedDevice.ipAddress} | Location: {selectedDevice.location || "—"}</p>
+              </div>
+              <button
+                type="button"
+                className="device-logs-modal-close"
+                onClick={() => setSelectedDevice(null)}
+                aria-label="Close alert logs"
+              >
+                ×
+              </button>
+            </header>
+            <div className="device-logs-modal-content">
+              <AlertMailList
+                key={selectedDevice.id}
+                alerts={selectedDeviceLogs}
+                initialSearch=""
+                initialMonth="all"
+                initialYear=""
+              />
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

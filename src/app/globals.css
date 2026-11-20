@@ -292,6 +292,90 @@ tbody tr:last-child td {
   border-radius: 8px;
 }
 
+.devices-monitor-table-scroll {
+  overflow: auto;
+}
+
+.devices-monitor-table-scroll table {
+  min-width: 1450px;
+}
+
+.devices-monitor-table-scroll th,
+.devices-monitor-table-scroll td {
+  white-space: nowrap;
+}
+
+.devices-monitor-table-scroll .device-offline-time {
+  color: var(--color-offline);
+}
+
+.devices-monitor-table-scroll .device-online-time {
+  color: var(--color-online);
+}
+
+.devices-monitor-table-scroll .device-history-empty {
+  color: var(--color-text-muted);
+}
+
+.device-logs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 55%);
+}
+
+.device-logs-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 95vw);
+  max-height: 90vh;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgb(15 23 42 / 25%);
+}
+
+.device-logs-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.device-logs-modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.device-logs-modal-header p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.device-logs-modal-close {
+  flex: none;
+  padding: 4px 8px;
+  color: var(--color-text-muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.device-logs-modal-content {
+  overflow: auto;
+  padding: 16px 20px;
+}
+
 .table-scroll-container table {
   width: 100%;
   border-collapse: separate;

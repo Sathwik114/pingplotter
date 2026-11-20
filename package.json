@@ -6,7 +6,7 @@
         "dev": "concurrently -k -n \"next,worker\" -c \"cyan,magenta\" \"next dev -p 8004\" \"node worker/monitor.js\"",
         "dev:next": "next dev -p 8004",
         "build": "next build",
-        "start": "concurrently -k -n \"next,worker\" -c \"cyan,magenta\" \"next start -p 8004\" \"node worker/monitor.js\"",
+        "start": "next start -p 8004",
         "start:next": "next start -p 8004",
         "worker": "node worker/monitor.js",
         "prisma:generate": "prisma generate",

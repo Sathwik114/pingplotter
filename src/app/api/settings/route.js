@@ -15,6 +15,18 @@ export async function PUT(request) {
     monitoringEnabled,
   } = body;
 
+  if (
+    dailyReportTime !== undefined &&
+    dailyReportTime !== null &&
+    dailyReportTime !== "" &&
+    !/^([01]\d|2[0-3]):([0-5]\d)$/.test(dailyReportTime)
+  ) {
+    return NextResponse.json(
+      { error: "Daily report time must be in HH:mm format." },
+      { status: 400 }
+    );
+  }
+
   try {
     const settings = await updateSettings({
       ...(defaultPingInterval !== undefined && {

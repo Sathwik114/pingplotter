@@ -12,7 +12,10 @@ export async function sendMail({ to, subject, text }) {
     const secure = process.env.SMTP_SECURE === "true";
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
-    const from = process.env.MAIL_FROM || user;
+    const from = {
+      name: "PingPlotter",
+      address: process.env.MAIL_FROM || user,
+    };
 
     if (!host || !port || !from) {
       console.error("[mailer] SMTP is not configured via .env.");

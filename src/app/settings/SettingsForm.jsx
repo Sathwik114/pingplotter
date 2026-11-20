@@ -8,7 +8,7 @@ export default function SettingsForm({ settings }) {
   const [form, setForm] = useState({
     defaultPingInterval: settings.defaultPingInterval,
     defaultFailureThreshold: settings.defaultFailureThreshold,
-    dailyReportTime: settings.dailyReportTime || "08:00",
+    dailyReportTime: settings.dailyReportTime || "08:30",
     monitoringEnabled: settings.monitoringEnabled,
   });
   const [saved, setSaved] = useState(false);
@@ -85,7 +85,7 @@ export default function SettingsForm({ settings }) {
 
 
         <div className="form-field">
-          <label htmlFor="dailyReportTime">Daily Report Time</label>
+          <label htmlFor="dailyReportTime">Daily Offline Report Time (server local time)</label>
           <input
             id="dailyReportTime"
             name="dailyReportTime"
@@ -93,6 +93,7 @@ export default function SettingsForm({ settings }) {
             value={form.dailyReportTime}
             onChange={handleChange}
           />
+          <small>Offline device reports are sent to their configured alert email addresses. Leave blank to disable.</small>
         </div>
 
         <div className="form-field full">

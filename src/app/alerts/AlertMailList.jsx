@@ -56,6 +56,7 @@ export default function AlertMailList({
   const recoveryCount = alerts.filter(
     (a) => a.status && (a.status.toLowerCase().includes("recovery") || a.status.toLowerCase().includes("online"))
   ).length;
+  const shouldScrollLogs = filtered.length > 16;
 
   if (alerts.length === 0) {
     return (
@@ -153,12 +154,12 @@ export default function AlertMailList({
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div
           style={{
-            maxHeight: filtered.length > 10 ? 440 : "none",
-            overflowY: filtered.length > 10 ? "auto" : "visible",
+            maxHeight: shouldScrollLogs ? 620 : "none",
+            overflowY: shouldScrollLogs ? "auto" : "visible",
             overflowX: "auto",
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, whiteSpace: "nowrap" }}>
             <thead>
               <tr style={{ background: "#fafbfc", borderBottom: "1px solid #eaecf0" }}>
                 {["Device", "IP Address", "Department", "Location", "Status", "Result", "Time", "Sent To"].map((h) => (

@@ -1,12 +1,11 @@
 /**
  * Background monitoring worker.
  *
- * Run this as a separate long-running process alongside `next start`:
- *   node worker/monitor.js
+ * In production, src/instrumentation.js starts this alongside `next start`.
+ * For standalone use, run: node worker/monitor.js
  *
- * (In production, run it under pm2 / systemd / a Docker sidecar so it
- * restarts automatically. Next.js API routes are request/response only
- * and cannot host a persistent background loop themselves.)
+ * Run the Next.js server under a process manager in production so the
+ * server and worker are restarted together if either one exits.
  *
  * What it does:
  *  - Every SYNC_INTERVAL_MS, re-reads the device list from the DB and makes
@@ -45,6 +44,7 @@ let runningChecks = 0;
 let syncInProgress = false;
 // Set of device IDs whose first check has completed since worker/server startup
 const checkedSinceStartup = new Set();
+let lastDailyReportDate = null;
 
 function getImageFilePath(imagePath) {
   if (!imagePath) return null;
@@ -146,7 +146,10 @@ async function sendMail({ to, subject, text, html, imageData, imageMimeType, ima
         : port === 465;
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
-    const from = process.env.MAIL_FROM || user;
+    const from = {
+      name: "PingPlotter",
+      address: process.env.MAIL_FROM || user,
+    };
 
     if (!host || !port || !from) {
       console.error("[worker] SMTP is not configured via .env; skipping email.");
@@ -214,6 +217,126 @@ async function sendMail({ to, subject, text, html, imageData, imageMimeType, ima
   } catch (err) {
     console.error("[worker] Email send failed:", err.message);
     return false;
+  }
+}
+
+async function sendDailyOfflineReport(reportTime) {
+  const timeMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(reportTime || "");
+  if (!timeMatch) {
+    if (reportTime) {
+      console.error(`[worker] Invalid daily report time "${reportTime}"; expected HH:mm.`);
+    }
+    return;
+  }
+
+  const now = new Date();
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const scheduledMinutes = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+
+  if (currentMinutes !== scheduledMinutes || lastDailyReportDate === dateKey) return;
+
+  const offlineDevices = await prisma.device.findMany({
+    where: { enabled: true, status: "OFFLINE" },
+    select: {
+      id: true,
+      name: true,
+      ipAddress: true,
+      department: true,
+      alertEmail: true,
+      alertLogs: {
+        where: { status: "Offline" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { createdAt: true },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  if (offlineDevices.length === 0) {
+    lastDailyReportDate = dateKey;
+    console.log("[worker] Daily offline report skipped; no enabled offline devices.");
+    return;
+  }
+
+  lastDailyReportDate = dateKey;
+  const devicesByRecipient = new Map();
+  for (const device of offlineDevices) {
+    for (const email of device.alertEmail.split(",").map((value) => value.trim()).filter(Boolean)) {
+      const recipient = email.toLowerCase();
+      if (!devicesByRecipient.has(recipient)) devicesByRecipient.set(recipient, []);
+      devicesByRecipient.get(recipient).push(device);
+    }
+  }
+
+  const reportTimeText = now.toLocaleString();
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+  for (const [recipient, devices] of devicesByRecipient) {
+    const tableRows = devices.map((device) => {
+      const lastOfflineAt = device.alertLogs[0]?.createdAt;
+      const lastOfflineText = lastOfflineAt
+        ? new Date(lastOfflineAt).toLocaleString()
+        : "No offline transition log";
+      return {
+        device,
+        lastOfflineText,
+        html: `<tr>
+          <td style="padding:14px 16px;border:1px solid #667085;color:#172033;font-weight:600;text-align:center;">${escapeHtml(device.name)}</td>
+          <td style="padding:14px 16px;border:1px solid #667085;color:#344054;font-family:Consolas,Monaco,monospace;white-space:nowrap;text-align:center;">${escapeHtml(device.ipAddress)}</td>
+          <td style="padding:14px 16px;border:1px solid #667085;color:#475467;text-align:center;">${escapeHtml(device.department || "—")}</td>
+          <td style="padding:14px 16px;border:1px solid #667085;color:#b42318;white-space:nowrap;text-align:center;">${escapeHtml(lastOfflineText)}</td>
+        </tr>`,
+      };
+    });
+    const textRows = tableRows.map(({ device, lastOfflineText }) =>
+      `${device.name} | ${device.ipAddress} | ${device.department || "—"} | ${lastOfflineText}`
+    ).join("\n");
+    const html = `<!doctype html>
+      <html><body style="margin:0;padding:24px;background:#f3f6fa;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+        <div style="max-width:900px;margin:0 auto;background:#ffffff;border:1px solid #e3e9f1;border-radius:12px;overflow:hidden;">
+          <div style="padding:24px 28px;background:#142b4a;color:#ffffff;">
+            <div style="font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#b9cee8;">PingPlotter daily report</div>
+            <h1 style="margin:8px 0 4px;font-size:23px;line-height:1.3;">Offline devices</h1>
+            <p style="margin:0;color:#d7e3f1;font-size:13px;">${devices.length} device${devices.length === 1 ? "" : "s"} currently offline · ${escapeHtml(reportTimeText)}</p>
+          </div>
+          <div style="padding:22px 20px 26px;">
+            <table role="presentation" border="1" bordercolor="#667085" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border:2px solid #344054;font-size:13px;">
+              <thead><tr style="background:#edf3f9;">
+                <th align="center" style="padding:12px 16px;border:1px solid #667085;background:#edf3f9;color:#344054;font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:.5px;">Device name</th>
+                <th align="center" style="padding:12px 16px;border:1px solid #667085;background:#edf3f9;color:#344054;font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:.5px;">IP</th>
+                <th align="center" style="padding:12px 16px;border:1px solid #667085;background:#edf3f9;color:#344054;font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:.5px;">Department</th>
+                <th align="center" style="padding:12px 16px;border:1px solid #667085;background:#edf3f9;color:#344054;font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:.5px;">Last offline time</th>
+              </tr></thead>
+              <tbody>${tableRows.map((row) => row.html).join("")}</tbody>
+            </table>
+            <p style="margin:16px 0 0;color:#667085;font-size:12px;line-height:1.5;text-align:center;">This is an automatically generated email from the PingPlotter software.</p>
+          </div>
+        </div>
+      </body></html>`;
+    const sent = await sendMail({
+      to: recipient,
+      subject: "[DAILY REPORT] Offline devices",
+      text: `OFFLINE DEVICES — ${reportTimeText}\n\nDevice name | IP | Department | Last offline time\n${textRows}\n\nThis is an automatically generated email from the PingPlotter software.`,
+      html,
+    });
+
+    await Promise.all(devices.map((device) => prisma.alertLog.create({
+      data: {
+        deviceId: device.id,
+        status: "Daily Offline Report",
+        email: recipient,
+        result: sent ? "Sent" : "Failed",
+      },
+    })));
+    console.log(`[worker] Daily offline report to ${recipient}: ${sent ? "sent" : "failed"}`);
   }
 }
 
@@ -532,6 +655,8 @@ async function syncTimers() {
       }
       return;
     }
+
+    await sendDailyOfflineReport(settings.dailyReportTime);
 
     const devices = await prisma.device.findMany({ where: { enabled: true } });
     const currentIds = new Set(devices.map((d) => d.id));

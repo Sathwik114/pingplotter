@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSessionToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import {
+  createSessionToken,
+  AUTH_COOKIE_NAME,
+  isSecureRequest,
+} from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +47,7 @@ export async function POST(request) {
       name: AUTH_COOKIE_NAME,
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureRequest(request),
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
